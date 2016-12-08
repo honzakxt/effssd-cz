@@ -1,5 +1,5 @@
-Surveillance Self Defense
-=========================
+Surveillance Self Defense - Czech translation
+=============================================
 
 Copyleft (c) 2014 Electronic Frontier Foundation.
 
