@@ -1,0 +1,487 @@
+<?php
+/**
+ * @file
+ * Allows to track errors to Sentry server.
+ */
+
+define('RAVEN_JS_CDN_URL', 'https://cdn.ravenjs.com/3.4.1/raven.min.js');
+
+/**
+ * Implements hook_menu().
+ */
+function raven_menu() {
+  $items = array();
+
+  $items['admin/config/development/raven'] = array(
+    'title' => 'Raven',
+    'description' => 'Administer Raven settings.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('raven_settings_form'),
+    'access arguments' => array('administer site configuration'),
+    'file' => 'raven.admin.inc',
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function raven_permission() {
+  return array(
+    'send javascript errors to sentry' => array(
+      'title' => t('Send JavaScript errors to Sentry'),
+      'description' => t("For users with this permission, JavaScript errors will be captured and submitted to the Sentry server's public DSN."),
+    ),
+  );
+}
+
+/**
+ * Implements hook_libraries_info().
+ */
+function raven_libraries_info() {
+  if (module_exists('xautoload')) {
+    $libraries['log'] = array(
+      'name' => 'PSR Log',
+      'vendor url' => 'https://github.com/php-fig/log',
+      'download url' => 'https://github.com/php-fig/log/releases',
+      'xautoload' => function($adapter) {
+        $adapter->composerJson('composer.json');
+      },
+      'version' => '1.0.0',
+    );
+    $libraries['monolog'] = array(
+      'name' => 'Monolog',
+      'vendor url' => 'https://github.com/Seldaek/monolog',
+      'download url' => 'https://github.com/Seldaek/monolog/releases',
+      'version arguments' => array(
+        'file' => 'CHANGELOG.mdown',
+        'pattern' => '/### ([0-9a-zA-Z._-]+) /',
+        'lines' => 1,
+      ),
+      'xautoload' => function($adapter) {
+        $adapter->composerJson('composer.json');
+      },
+      'dependencies' => array(
+        'log',
+      ),
+    );
+    $libraries['sentry-php'] = array(
+      'name' => 'Sentry PHP',
+      'vendor url' => 'https://github.com/getsentry/sentry-php',
+      'download url' => 'https://github.com/getsentry/sentry-php/releases',
+      'version arguments' => array(
+        'file' => 'lib/Raven/Client.php',
+        'pattern' => '#const\s+VERSION\s*=\s*\'([0-9a-z._-]+)\';#',
+        'lines' => 25,
+      ),
+      'xautoload' => function($adapter) {
+        $adapter->composerJson('composer.json');
+      },
+      'dependencies' => array(
+        'monolog',
+      ),
+      'path' => 'lib/Raven',
+      'files' => array(
+        'php' => array(
+          'Client.php',
+        ),
+      ),
+    );
+  }
+  else {
+    drupal_set_message(t('XAutoload module is required.'), 'warning');
+  }
+
+  $libraries['raven-js'] = array(
+    'name' => 'Raven.js',
+    'vendor url' => 'https://github.com/getsentry/raven-js',
+    'download url' => 'https://github.com/getsentry/raven-js/releases',
+    'version arguments' => array(
+      'file' => 'dist/raven.min.js',
+      'pattern' => '#Raven.js\s*([0-9a-z._-]+)#',
+      'lines' => 25,
+    ),
+    'path' => 'dist',
+    'files' => array(
+      'js' => array(
+        'raven.min.js' => array(
+          'group' => JS_LIBRARY,
+          'every_page' => TRUE,
+        ),
+      ),
+    ),
+  );
+
+  return $libraries;
+}
+
+/**
+ * Implements hook_init().
+ */
+function raven_init() {
+  if (!variable_get('raven_enabled', FALSE)) {
+    return;
+  }
+
+  $client = _raven_get_client();
+  if (!$client) {
+    return;
+  }
+
+  // Get enabled error handlers.
+  $exception_handler = variable_get('raven_exception_handler', TRUE);
+  $fatal_error_handler = variable_get('raven_fatal_error_handler', TRUE);
+  $error_handler = variable_get('raven_error_handler', TRUE);
+
+  // Bind the logged in user.
+  $user = array();
+  drupal_alter('raven_user', $user);
+  $client->user_context($user);
+
+  // Tag the request with something interesting.
+  $tags = array();
+  drupal_alter('raven_tags', $tags);
+  $client->tags_context($tags);
+
+  // Provide a bit of additional context.
+  $extra = array();
+  drupal_alter('raven_extra', $extra);
+  $client->extra_context($extra);
+
+  $raven_error_handler = _raven_get_error_handler();
+
+  if ($exception_handler) {
+    $raven_error_handler->registerExceptionHandler();
+  }
+
+  if ($fatal_error_handler) {
+    $reserved_memory = variable_get('raven_fatal_error_handler_memory', 2.5 * 1024);
+    $raven_error_handler->registerShutdownFunction($reserved_memory);
+    // Call the cURL handler's shutdown function again to send any fatal errors.
+    register_shutdown_function(array($client->_curl_handler, 'join'));
+  }
+
+  if ($error_handler) {
+    $old_error_handler = set_error_handler('_raven_error_handler');
+    $GLOBALS['_raven_old_error_handler'] = $old_error_handler;
+  }
+}
+
+/**
+ * Implements hook_page_build().
+ */
+function raven_page_build(&$page) {
+  global $user;
+  if (variable_get('raven_js_enabled', FALSE) && user_access('send javascript errors to sentry')) {
+    if (variable_get('raven_js_source', 'cdn') == 'cdn') {
+      drupal_add_js(variable_get('raven_js_cdn_url', RAVEN_JS_CDN_URL), array('type' => 'external', 'group' => JS_LIBRARY));
+    }
+    drupal_add_js(array('raven' => array(
+      'dsn' => variable_get('raven_public_dsn', ''),
+      // Other modules can alter the Raven.js options.
+      'options' => new stdClass(),
+      'user' => array('id' => $user->uid),
+    )), 'setting');
+    drupal_add_js(drupal_get_path('module', 'raven') . '/raven.js', array('group' => JS_LIBRARY, 'scope' => 'footer', 'every_page' => TRUE));
+  }
+}
+
+/**
+ * PHP error handler.
+ *
+ * @param int $code
+ *   The level of the error raised.
+ * @param string $message
+ *   The error message.
+ * @param string $file
+ *   The filename that the error was raised in.
+ * @param int $line
+ *   The line number the error was raised at.
+ * @param array $context
+ *   An array of every variable that existed in the scope the error was
+ *   triggered in.
+ */
+function _raven_error_handler($code, $message, $file = '', $line = 0, array $context = array()) {
+  $error_levels = _raven_get_enabled_error_levels();
+  if ($error_levels & $code & error_reporting()) {
+    $filter = array(
+      'process' => TRUE,
+      'code' => $code,
+      'message' => $message,
+      'file' => $file,
+      'line' => $line,
+      'context' => $context,
+    );
+    drupal_alter('raven_error_filter', $filter);
+
+    if ($filter['process']) {
+      $raven_error_handler = _raven_get_error_handler();
+      $e = new ErrorException($message, 0, $code, $file, $line);
+      $raven_error_handler->handleException($e, TRUE, $context);
+    }
+  }
+
+  $old_error_handler = $GLOBALS['_raven_old_error_handler'];
+  if ($old_error_handler) {
+    call_user_func($old_error_handler, $code, $message, $file, $line, $context);
+  }
+}
+
+/**
+ * Returns PHP error levels which should be logged.
+ *
+ * @return int
+ *   Combination of the error levels, joined with the binary OR (|) operator.
+ */
+function _raven_get_enabled_error_levels() {
+  static $error_levels;
+  if (!isset($error_levels)) {
+    $error_levels = 0;
+    $enabled_error_types = variable_get('raven_error_levels', array());
+    foreach ($enabled_error_types as $level => $enabled) {
+      if ($enabled) {
+        $error_levels |= $level;
+      }
+    }
+  }
+  return $error_levels;
+}
+
+/**
+ * Implements hook_watchdog().
+ */
+function raven_watchdog($log_entry) {
+  if (!variable_get('raven_enabled', FALSE)) {
+    return;
+  }
+
+  if (!variable_get('raven_watchdog_handler', FALSE)) {
+    return;
+  }
+
+  // Do not process php errors.
+  if ($log_entry['type'] === 'php') {
+    return;
+  }
+
+  $watchdog_levels = variable_get('raven_watchdog_levels', array());
+
+  if (empty($watchdog_levels[$log_entry['severity'] + 1])) {
+    return;
+  }
+
+  $filter = array(
+    'process' => TRUE,
+    'log_entry' => $log_entry,
+  );
+  if ($log_entry['type'] === 'page not found') {
+    $filter['process'] = (bool) variable_get('raven_watchdog_page_not_found', FALSE);
+  }
+  drupal_alter('raven_watchdog_filter', $filter);
+
+  if (!$filter['process']) {
+    return;
+  }
+
+  if (!raven_libraries_load()) {
+    return;
+  }
+
+  $levels_map = array(
+    WATCHDOG_EMERGENCY => Raven_Client::FATAL,
+    WATCHDOG_ALERT => Raven_Client::FATAL,
+    WATCHDOG_CRITICAL => Raven_Client::FATAL,
+    WATCHDOG_ERROR => Raven_Client::ERROR,
+    WATCHDOG_WARNING => Raven_Client::WARNING,
+    WATCHDOG_NOTICE => Raven_Client::INFO,
+    WATCHDOG_INFO => Raven_Client::INFO,
+    WATCHDOG_DEBUG => Raven_Client::DEBUG,
+  );
+
+  $variables = $log_entry['variables'];
+  if (!$variables) {
+    $variables = array();
+  }
+
+  $data = array(
+    'level' => $levels_map[$log_entry['severity']],
+    'message' => strip_tags(format_string($log_entry['message'], $variables)),
+    'sentry.interfaces.Message' => array(
+      'message' => $log_entry['message'],
+      'params' => $log_entry['variables'],
+    ),
+    'tags' => array(
+      'type' => $log_entry['type'],
+    ),
+    'extra' => array(
+      'link' => $log_entry['link'],
+      'request_uri' => $log_entry['request_uri'],
+      'referer' => $log_entry['referer'],
+      'ip' => $log_entry['ip'],
+    ),
+    'logger' => 'watchdog',
+  );
+
+  $client = _raven_get_client();
+  if (!$client) {
+    return;
+  }
+
+  // By default, disable reflection tracing for user watchdog entries.
+  if ($data['tags']['type'] === 'user' && $client->trace && !variable_get('raven_trace_user', FALSE)) {
+    $client->trace = FALSE;
+    $client->capture($data, NULL);
+    $client->trace = TRUE;
+  }
+  else {
+    $client->capture($data, NULL);
+  }
+}
+
+/**
+ * Returns an instance of the Raven PHP client.
+ *
+ * @return Raven_Client
+ *   Raven PHP client library instance.
+ */
+function _raven_get_client() {
+  static $client;
+
+  if (!isset($client)) {
+    if (!raven_libraries_load()) {
+      return;
+    }
+
+    // Prepare config.
+    $dsn = variable_get('raven_dsn', NULL);
+    $timeout = variable_get('raven_timeout', 2);
+    $stack = variable_get('raven_stack', TRUE);
+    $trace = variable_get('raven_trace', FALSE);
+
+    // Build the field sanitization regular expression.
+    $fields = array('SESS', 'key', 'token', 'pass', 'authorization', 'password', 'passwd', 'secret', 'password_confirmation', 'card_number', 'auth_pw');
+    drupal_alter('raven_sanitize_fields', $fields);
+    $fields_re = '/(' . implode('|', $fields) . ')/i';
+
+    $options = array(
+      'timeout' => $timeout,
+      'auto_log_stacks' => $stack,
+      'trace' => $trace,
+      'tags' => array(
+        'php_version' => phpversion(),
+      ),
+      'processorOptions' => array(
+        'Raven_SanitizeDataProcessor' => array(
+          'fields_re' => $fields_re,
+        ),
+      ),
+      'curl_method' => 'async',
+      'verify_ssl' => TRUE,
+    );
+
+    $raven_ssl = variable_get('raven_ssl', 'verify_ssl');
+    // Verify against a CA certificate.
+    if ($raven_ssl == 'ca_cert') {
+      $options['ca_cert'] = drupal_realpath(variable_get('raven_ca_cert', ''));
+    }
+    // Don't verify at all.
+    elseif ($raven_ssl == 'no_verify_ssl') {
+      $options['verify_ssl'] = FALSE;
+    }
+
+    // Instantiate a new client with a compatible DSN.
+    $client = new Raven_Client($dsn, $options);
+  }
+
+  return $client;
+}
+
+/**
+ * Returns an instance of the Raven PHP error handler.
+ *
+ * @return Raven_ErrorHandler
+ *   Raven PHP error handler.
+ */
+function _raven_get_error_handler() {
+  static $handler;
+
+  if (!isset($handler)) {
+    $client = _raven_get_client();
+    if ($client) {
+      $handler = new Raven_ErrorHandler($client);
+    }
+  }
+
+  return $handler;
+}
+
+/**
+ * Implements hook_raven_user_alter().
+ */
+function raven_raven_user_alter(array &$variables) {
+  global $user;
+  $variables['ip_address'] = ip_address();
+  if (user_is_logged_in()) {
+    $variables['id'] = $user->uid;
+    $variables['name'] = $user->name;
+    $variables['email'] = $user->mail;
+    $variables['roles'] = implode(', ', $user->roles);
+  }
+}
+
+/**
+ * Implements hook_raven_error_filter_alter().
+ */
+function raven_raven_error_filter_alter(array &$error) {
+  $known_errors = array();
+
+  drupal_alter('raven_known_php_errors', $known_errors);
+
+  // Filter known errors to prevent spamming the Sentry server.
+  foreach ($known_errors as $known_error) {
+    $check = TRUE;
+
+    foreach ($known_error as $key => $value) {
+      if ($error[$key] != $value) {
+        $check = FALSE;
+        break;
+      }
+    }
+
+    if ($check) {
+      $error['process'] = FALSE;
+      break;
+    }
+  }
+}
+
+/**
+ * Loads Sentry PHP and Raven.js libraries.
+ *
+ * @return boolean
+ *   Returns TRUE if libraries loaded or FALSE otherwise.
+ */
+function raven_libraries_load() {
+  static $message_sent = FALSE, $message_sent_js = FALSE;
+  $library = libraries_load('sentry-php');
+  // This function can be called multiple times, so prevent multiple messages.
+  if (!$library['loaded'] && !$message_sent) {
+    drupal_set_message(t('Sentry PHP library cannot be loaded. Check <a href="@url">reports</a> for more details.', array(
+      '@url' => url('admin/reports/status'),
+    )), 'warning');
+    $message_sent = TRUE;
+  }
+  $library_js['loaded'] = TRUE;
+  if (variable_get('raven_js_enabled', FALSE) && variable_get('raven_js_source', 'cdn') == 'library') {
+    $library_js = libraries_load('raven-js');
+    if (!$library_js['loaded'] && !$message_sent_js) {
+      drupal_set_message(t('Raven.js library cannot be loaded. Check <a href="@url">settings</a>.', array(
+        '@url' => url('admin/config/development/raven'),
+      )), 'warning');
+      $message_sent_js = TRUE;
+    }
+  }
+  return (bool) $library['loaded'] && $library_js['loaded'];
+}

@@ -1,0 +1,104 @@
+<?php
+
+/**
+ * Implements hook_page_build().
+ */
+function ssd_legacy_page_build(&$page) {
+  // Add a Wayback Machine link to 404 pages.
+  if (drupal_get_http_header('Status') != '404 Not Found') {
+    return;
+  }
+  $legacy_paths = array(
+    '3rdparties' => 'Information Stored By Third Parties',
+    '3rdparties/govt' => 'What Can the Government Do?',
+    '3rdparties/govt/court-order' => 'Other Records Require a Court Order',
+    '3rdparties/govt/records' => 'Not All Records are Protected',
+    '3rdparties/govt/stronger-protection' => 'Some Content Receives Stronger Protection',
+    '3rdparties/govt/subpoena' => 'Some Records Only Require a Subpoena',
+    '3rdparties/protect' => 'What Can I Do To Protect Myself?',
+    '3rdparties/protect/conclusion' => 'Summing Up',
+    '3rdparties/protect/email-download' => 'Protecting Email: Download and Delete!',
+    '3rdparties/protect/email-encryption' => 'Protecting Email: Use Email Encryption When You Can',
+    '3rdparties/protect/email-inbox' => 'Protecting Your Email Inbox',
+    '3rdparties/protect/email-webmail' => "Don't Use Webmail if You Don't Need It - or POP It.",
+    '3rdparties/protect/getting-started' => 'Getting Started',
+    '3rdparties/protect/instant-messaging' => 'Protecting Instant Messaging',
+    '3rdparties/protect/location' => 'Protecting Your Location Information',
+    '3rdparties/protect/method' => 'Choosing a Communications Method',
+    '3rdparties/protect/search-history' => 'Protecting Your Search Privacy and Your Web Browsing Activity',
+    '3rdparties/protect/sms' => 'Protecting SMS',
+    '3rdparties/protect/storage' => 'Online Storage of Your Private Data',
+    '3rdparties/protect/tmi' => 'TMI on the Web',
+    '3rdparties/protect/voicemail' => 'Protecting Your Voicemail',
+    '3rdparties/protect/voip' => 'Protecting Your Voice Over IP Communications',
+    'foreign' => 'Foreign Intelligence and Terrorism Investigations ',
+    'foreign/beyond-fisa' => 'Beyond FISA',
+    'foreign/fisa' => 'Surveillance Under the Foreign Intelligence Surveillance Act (FISA)',
+    'foreign/nsl' => 'National Security Letters',
+    'foreign/summing-up' => 'Summing Up',
+    'home' => 'The SSD Project',
+    'risk' => 'Risk Management',
+    'risk/adversaries' => 'Adversaries',
+    'risk/assets' => 'Assets',
+    'risk/lessons' => 'A Few Parting Lessons',
+    'risk/likelihood' => 'Risk',
+    'risk/putting-it-all-together' => 'Putting it All Together',
+    'risk/threats' => 'Threats',
+    'tech' => 'Defensive Technology',
+    'tech/browsers' => 'Web Browsers',
+    'tech/deletion' => 'Secure Deletion',
+    'tech/disk-encryption' => 'File and Disk Encryption',
+    'tech/email' => 'Email',
+    'tech/encryption' => 'Encryption Basics',
+    'tech/im' => 'Instant Messaging (IM)',
+    'tech/internet' => 'Internet Basics',
+    'tech/malware' => 'Malware',
+    'tech/mobile' => 'Mobile Devices',
+    'tech/tor' => 'Tor',
+    'tech/voip' => 'Voice over Internet Protocol (VoIP)',
+    'tech/vpn' => 'Virtual Private Networks (VPN)',
+    'tech/wifi' => 'Wi-Fi',
+    'wire' => 'Data on the Wire',
+    'wire/govt' => 'What Can the Government Do?',
+    'wire/govt/pen-registers' => '"Pen Registers" and "Trap and Trace Devices"',
+    'wire/govt/wiretap-statistics' => 'Wiretap Statistics',
+    'wire/govt/wiretapping' => 'Wiretapping',
+    'wire/govt/wiretapping-authorization' => 'Getting a Court Order Authorizing a Wiretap',
+    'wire/govt/wiretapping-protections' => 'Wiretapping Law Protections',
+    'wire/protect' => 'What Can I Do To Protect Myself?',
+    'wire/protect/cell-tracking' => 'Defend Yourself Against Cell Phone Tracking',
+    'wire/protect/eavesdropping' => 'Electronic Eavesdropping is Legally Hard for the Government, But Technically Easy',
+    'wire/protect/encrypt' => 'Learn to Encrypt Your Internet Communications',
+    'wire/protect/f2f' => 'Face-to-Face Conversations Are the Safest Bet',
+    'wire/protect/method' => 'Choosing a Communication Method',
+    'wire/protect/sms' => 'Avoid SMS Text Messages If You Can',
+    'wire/protect/summing-up' => 'Summing Up',
+    'wire/protect/telephone' => 'Using the Telephone is Still the Second Safest Bet',
+    'wire/protect/voip' => 'What About Phone Calls Using the Internet?',
+    'your-computer' => 'Data Stored on Your Computer',
+    'your-computer/govt' => 'What Can the Government Do?',
+    'your-computer/govt/fourth-amendment' => 'The Fourth Amendment',
+    'your-computer/govt/privacy' => 'Reasonable Expectation of Privacy',
+    'your-computer/govt/sita' => 'Search Incident to Lawful Arrest',
+    'your-computer/govt/sneak-and-peek' => '"Sneak and Peek" Search Warrants',
+    'your-computer/govt/subpoenas' => 'Subpoenas',
+    'your-computer/govt/warrantless' => 'Warrantless Searches',
+    'your-computer/govt/warrants' => 'Search Warrants',
+    'your-computer/protect' => 'What Can I Do To Protect Myself?',
+    'your-computer/protect/basics' => 'Master the Basics of Data Protection',
+    'your-computer/protect/encrypt' => 'Encrypt Your Data',
+    'your-computer/protect/malware' => 'Protect Yourself Against Malware ',
+    'your-computer/protect/passwords' => 'Learn How to Use Passwords Properly',
+    'your-computer/protect/retention' => 'Develop a Data Retention and Destruction Policy',
+    'your-computer/protect/summing-up' => 'Summing Up',
+  );
+  $destination = drupal_get_destination();
+  if (!isset($legacy_paths[$destination['destination']])) {
+    return;
+  }
+  $link = 'https://web.archive.org/web/*/https://ssd.eff.org/' . $destination['destination'];
+  drupal_set_message(t("Hi, you're looking for the page %title on our previous Surveillance Self-Defense project, which is now out-of-date. You can see the original page at the !link or an up-to-date relevant section of our new guide below.", array('%title' => $legacy_paths[$destination['destination']], '!link' => l(t("Internet Archive's Wayback Machine"), $link))), 'warning');
+  unset($_GET['destination']);
+  drupal_goto('index', array(), 301);
+}
+

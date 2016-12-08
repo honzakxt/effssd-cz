@@ -1,0 +1,66 @@
+<?php
+
+/**
+ * @file
+ * Tests for Raven.module.
+ */
+
+/**
+ * Tests logging messages to the database.
+ */
+class RavenTestCase extends DrupalWebTestCase {
+
+  /**
+   * A user with some relevant administrative permissions.
+   *
+   * @var object
+   */
+  protected $admin_user;
+
+  /**
+   * A user without any permissions.
+   *
+   * @var object
+   */
+  protected $any_user;
+
+  public static function getInfo() {
+    return array(
+      'name' => 'Raven',
+      'description' => 'Tests for Raven Sentry module.',
+      'group' => 'Raven',
+    );
+  }
+
+  /**
+   * Enable modules and create users with specific permissions.
+   */
+  function setUp() {
+    parent::setUp('raven');
+    $this->admin_user = $this->drupalCreateUser(array('administer site configuration', 'access administration pages', 'access site reports'));
+    $this->any_user = $this->drupalCreateUser(array());
+  }
+
+  /**
+   * Tests Raven module functionality.
+   */
+  function testRaven() {
+    $this->drupalLogin($this->admin_user);
+    $this->drupalGet('admin/config/development/raven');
+    $edit['raven_enabled'] = TRUE;
+    $edit['raven_watchdog_handler'] = TRUE;
+    $edit['raven_watchdog_levels[6]'] = 6;
+    $this->drupalPost(NULL, $edit, 'Save configuration');
+    $this->drupalLogout();
+
+    $library = libraries_load('sentry-php');
+    $this->drupalLogin($this->any_user);
+    if (!$library['loaded']) {
+      $this->assertText('Sentry PHP library cannot be loaded. Check reports for more details.');
+    }
+    else {
+      $this->assertNoText('Sentry PHP library cannot be loaded. Check reports for more details.');
+    }
+  }
+
+}

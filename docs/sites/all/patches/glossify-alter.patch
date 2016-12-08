@@ -1,0 +1,30 @@
+--- glossify.module	2014-09-19 15:05:05.750878151 -0700
++++ glossify.module	2014-09-23 13:52:56.995746364 -0700
+@@ -198,6 +198,13 @@
+   $result = db_query("SELECT tid AS id, name, LOWER(name) AS name_norm, description AS tip, format FROM {taxonomy_term_data} WHERE vid IN (:vids)", array(':vids' => $vocabs));
+   $terms = $result->fetchAllAssoc('name_norm');
+ 
++  // Allow other modules to alter the glossary terms.
++  $context = array(
++    'langcode' => $langcode,
++    'filter' => $filter,
++  );
++  drupal_alter('glossify_terms', $terms, $context);
++
+   //process text
+   if (count($terms) > 0) {
+     return _glossify_to_links($text, $terms, 'taxonomy', $filter->settings['glossify_taxonomy_case_sensitivity'], $filter->settings['glossify_taxonomy_first_only'], $filter->settings['glossify_taxonomy_tooltips']);
+@@ -225,6 +232,13 @@
+   }
+   $terms = $result->fetchAllAssoc('name_norm');
+ 
++  // Allow other modules to alter the glossary terms.
++  $context = array(
++    'langcode' => $langcode,
++    'filter' => $filter,
++  );
++  drupal_alter('glossify_terms', $terms, $context);
++
+   //process text
+   if (count($terms) > 0) {
+     return _glossify_to_links($text, $terms, 'content', $filter->settings['glossify_content_case_sensitivity'], $filter->settings['glossify_content_first_only'], $filter->settings['glossify_content_tooltips']);

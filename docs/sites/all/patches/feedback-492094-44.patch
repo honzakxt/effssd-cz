@@ -1,0 +1,239 @@
+diff --git a/feedback.module b/feedback.module
+index a4acfc0..f168784 100644
+--- a/feedback.module
++++ b/feedback.module
+@@ -81,6 +81,45 @@ function feedback_entity_info() {
+ }
+ 
+ /**
++ * Implements hook_entity_property_info().
++ */
++function feedback_entity_property_info() {
++  $info = array();
++  $properties = &$info['feedback']['properties'];
++
++  $properties['status'] = array(
++    'label' => t("Status"),
++    'type' => 'integer',
++    'description' => t("0 for new, 1 for processed"),
++    'schema field' => 'status',
++  );
++  $properties['author'] = array(
++    'label' => t("Author"),
++    'type' => 'user',
++    'description' => t("The author of the feedback."),
++    'setter callback' => 'entity_property_verbatim_set',
++    'required' => TRUE,
++    'schema field' => 'uid',
++  );
++  $properties['message'] = array(
++    'label' => t("Title"),
++    'description' => t("The feedback message."),
++    'setter callback' => 'entity_property_verbatim_set',
++    'schema field' => 'message',
++    'required' => TRUE,
++  );
++  $properties['timestamp'] = array(
++    'label' => t("Date created"),
++    'type' => 'date',
++    'schema field' => 'timestamp',
++    'description' => t("The date the feedback was created."),
++  );
++
++  return $info;
++}
++
++
++/**
+  * Implements hook_field_extra_fields().
+  */
+ function feedback_field_extra_fields() {
+@@ -591,3 +630,24 @@ function feedback_views_api() {
+     'path' => drupal_get_path('module', 'feedback') . '/views',
+   );
+ }
++
++
++/**
++ * Implements hook_feedback_insert().
++ */
++function feedback_feedback_insert($entry) {
++  // Trigger rule if Rules is enabled
++  if (module_exists('rules')) {
++    rules_invoke_event('feedback_insert', $entry);
++  }
++}
++
++/**
++ * Implements hook_feedback_update().
++ */
++function feedback_feedback_update($entry) {
++  // Trigger rule if Rules is enabled
++  if (module_exists('rules')) {
++    rules_invoke_event('feedback_update', $entry);
++  }
++}
+diff --git a/feedback.rules.inc b/feedback.rules.inc
+new file mode 100644
+index 0000000..829a84b
+--- /dev/null
++++ b/feedback.rules.inc
+@@ -0,0 +1,55 @@
++<?php
++
++/**
++ * @file
++ * Rules integration for feedback.
++ *
++ * @addtogroup rules
++ * @{
++ */
++
++/**
++ * Implements hook_rules_event_info().
++ */
++function feedback_rules_event_info() {
++  $defaults = array(
++    'group' => t('Feedback'),
++    'module' => 'feedback',
++    'access callback' => 'feedback_rules_integration_access',
++  );
++  return array(
++    'feedback_insert' => $defaults + array(
++      'label' => t('After saving new feedback'),
++      'variables' => array(
++        'feedback' => array('type' => 'feedback', 'label' => t('Feedback message')),
++      ),
++    ),
++    'feedback_update' => $defaults + array(
++      'label' => t('After saving existing feedback'),
++      'variables' => array(
++        'feedback' => array(
++          'type' => 'feedback',
++          'label' => t('Feedback message'),
++        ),
++        'feedback_unchanged' => array(
++          'type' => 'feedback',
++          'label' => t('unchanged feedback entity'),
++          'handler' => 'rules_events_entity_unchanged',
++        ),
++      ),
++    ),
++  );
++}
++
++/**
++ * Rules integration access callback.
++ */
++function feedback_rules_integration_access($type, $name) {
++  if ($type == 'event' || $type == 'condition') {
++    return entity_access('view', 'feedback');
++  }
++}
++
++/**
++ * @}
++ */
+diff --git a/feedback.tokens.inc b/feedback.tokens.inc
+new file mode 100644
+index 0000000..1c062dc
+--- /dev/null
++++ b/feedback.tokens.inc
+@@ -0,0 +1,97 @@
++<?php
++
++/**
++ * @file
++ * Builds placeholder replacement tokens for feedback-related data.
++ */
++
++/**
++ * Implements hook_token_info().
++ */
++function feedback_token_info() {
++  $types = array(
++    'feedback' => array(
++      'name' => t('Feedback'),
++      'description' => t('Tokens for feedback posted on the site.'),
++      'needs-data' => 'feedback',
++    ),
++  );
++
++  $tokens = array(
++    'feedback' => array(
++      'url' => array(
++        'name' => t("URL"),
++        'description' => t("The URL where feedback was submitted."),
++      ),
++      'useragent' => array(
++        'name' => t("User agent"),
++        'description' => t("The user agent string."),
++      ),
++      'message' => array(
++        'name' => t("Message"),
++        'description' => t("The message submitted."),
++      ),
++    ),
++  );
++
++  return array(
++    'types' => $types,
++    'tokens' => $tokens,
++  );
++}
++
++/**
++ * Implements hook_tokens().
++ */
++function feedback_tokens($type, $tokens, array $data = array(), array $options = array()) {
++  $url_options = array('absolute' => TRUE);
++  if (isset($options['language'])) {
++    $url_options['language'] = $options['language'];
++  }
++  $sanitize = !empty($options['sanitize']);
++
++  $replacements = array();
++
++  if ($type == 'feedback' && !empty($data['feedback'])) {
++    $feedback = $data['feedback'];
++
++    foreach ($tokens as $name => $original) {
++      switch ($name) {
++        case 'uid':
++          $replacements[$original] = $feedback->uid;
++          break;
++
++        case 'url':
++          $replacements[$original] = url($feedback->url, $url_options);
++          break;
++
++        case 'useragent':
++          $replacements[$original] = $feedback->useragent;
++          break;
++
++        case 'message':
++          $replacements[$original] = $sanitize ? check_plain($feedback->message) : $feedback->message;
++          break;
++
++        // Default values for the chained tokens handled below.
++        case 'author':
++          if ($feedback->uid == 0) {
++            $name = variable_get('anonymous', t('Anonymous'));
++          }
++          else {
++            $account = user_load($feedback->uid == 0);
++            $name = $account->name;
++          }
++          $replacements[$original] = $sanitize ? filter_xss($name) : $name;
++          break;
++      }
++    }
++
++    if ($author_tokens = token_find_with_prefix($tokens, 'author')) {
++      $author = user_load($feedback->uid);
++      $replacements += token_generate('user', $author_tokens, array('user' => $author), $options);
++    }
++  }
++
++  return $replacements;
++}

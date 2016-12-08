@@ -1,0 +1,141 @@
+/* For desktop or large screens */
+@media (min-width: 768px) {
+  .navbar-toggle {
+    display: block;
+  }
+  .navbar-collapse.collapse {
+    display: none !important;
+  }
+  .navbar-collapse.collapse.in {
+    display: block !important;
+  }
+  .navbar-nav > li {
+    float: none;
+  }
+  ul.navbar-nav {
+    float: none;
+  }
+}
+/** 
+* Media query for small screens
+* IMPORTANT:
+* If this is changed, the breakpoint in ssd-mobile.js must be changed
+* to match.
+*/
+@media (max-width: 767px) {
+  #top-eff-header,
+  #eff-footer {
+    display: none !important;
+  }
+  #navbar {
+    text-align: right;
+  }
+  #playlist-controller {
+    width: 100%;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    border-radius: 0;
+    -webkit-border-radius: 0;
+    -moz-border-radius: 0;
+    text-align: center;
+  }
+  .module-playlist-controller {
+    display: block;
+  }
+  .front .flexslider {
+    min-height: 0px;
+  }
+  .front .flexslider h1 {
+    font-size: 40px;
+  }
+  .front .flex-direction-nav .flex-next {
+    right: 5px; 
+  }
+  .front .flex-direction-nav .flex-prev {
+    left: 5px; 
+  }
+  #block-system-main .view-front-page-playlists {
+    padding: 0;
+  }
+  .front .flexslider .slides > li {
+    margin: 0;
+    min-height: 270px;
+  }
+  #playlist-controller.expanded {
+    width: 100%;
+  }
+  .node-type-playlist footer.footer {
+    margin-bottom: 68px;
+  }
+  .region-footer {
+    margin: 0;
+  }
+  #views-exposed-form-search-page #edit-keys-wrapper {
+    width: 210px;
+  }
+  #views-exposed-form-search-page .form-item input {
+    border: #ddd solid 1px;
+    width: 190px;
+  }
+  #views-exposed-form-search-page .views-submit-button {
+    margin-top: 26px;
+  }
+  .view-front-index-block .views-row .views-row-inner {
+    height: 98px;
+    padding: 8px;
+  }
+  .view-front-index-block .views-row .connect-bar {
+    background: transparent !important;
+  }
+  .view-front-index-block .views-row {
+    padding: 0px;
+    margin: 0px;
+    background-color: #789090;
+  }
+  .view-front-index-block .views-row .views-field-name .field-content,
+  .view-front-index-block .views-row .views-field-description-field .field-content {
+    display: none;
+  }
+}
+
+@media (max-width: 555px) {
+  .view-front-index-block .views-row .views-field-name-field-et .field-content {
+    font-size: 18px;
+  }
+}
+
+/* Shrink navbar search input as screen gets smaller */
+@media (max-width: 380px) {
+  #navbar #search-form--2 #edit-keys--2,
+  #navbar #search-form #edit-keys {
+    width: 80px;
+  }
+  #views-exposed-form-search-page #edit-keys-wrapper {
+    width: 160px;
+  }
+  #views-exposed-form-search-page .form-item input {
+    width: 140px;
+  }
+  .front .flexslider .slides > li {
+    min-height: 370px;
+  }
+  .view-front-index-block .views-row .views-field-name-field-et .field-content {
+    font-size: 14px;
+  }
+}
+@media (max-width: 320px) {
+  #navbar #search-form--2 #edit-keys--2,
+  #navbar #search-form #edit-keys {
+    width: 50px;
+  }
+  #views-exposed-form-search-page #edit-keys-wrapper {
+    width: 130px;
+  }
+  #views-exposed-form-search-page .form-item input {
+    width: 110px;
+  }
+  .front .flexslider .slides > li {
+    min-height: 400px;
+  }
+}

@@ -1,0 +1,4 @@
+name = SSD Import
+description = Drush scripts for helping import translated content.
+core = 7.x
+package = EFF

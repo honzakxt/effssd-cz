@@ -1,0 +1,48 @@
+--- glossify.module	2014-09-23 14:36:48.008792846 -0700
++++ glossify.module	2014-09-23 14:36:19.440651189 -0700
+@@ -207,7 +207,7 @@
+ 
+   //process text
+   if (count($terms) > 0) {
+-    return _glossify_to_links($text, $terms, 'taxonomy', $filter->settings['glossify_taxonomy_case_sensitivity'], $filter->settings['glossify_taxonomy_first_only'], $filter->settings['glossify_taxonomy_tooltips']);
++    return _glossify_to_links($text, $terms, 'taxonomy', $filter->settings['glossify_taxonomy_case_sensitivity'], $filter->settings['glossify_taxonomy_first_only'], $filter->settings['glossify_taxonomy_tooltips'], $langcode);
+   }
+   else {
+     return $text;
+@@ -241,7 +241,7 @@
+ 
+   //process text
+   if (count($terms) > 0) {
+-    return _glossify_to_links($text, $terms, 'content', $filter->settings['glossify_content_case_sensitivity'], $filter->settings['glossify_content_first_only'], $filter->settings['glossify_content_tooltips']);
++    return _glossify_to_links($text, $terms, 'content', $filter->settings['glossify_content_case_sensitivity'], $filter->settings['glossify_content_first_only'], $filter->settings['glossify_content_tooltips'], $langcode);
+   }
+   else {
+     return $text;
+@@ -262,7 +262,7 @@
+  * @return
+  *   The original HTML with the term string replaced by links.
+  */
+-function _glossify_to_links($text, $terms, $type, $case_sensitivity, $first_only, $tooltips) {
++function _glossify_to_links($text, $terms, $type, $case_sensitivity, $first_only, $tooltips, $langcode) {
+ 
+   //create dom document
+   $html_dom = filter_dom_load($text);
+@@ -311,7 +311,7 @@
+         }
+         else {
+           $tip = $tooltips ? check_markup($terms[strtolower($term_norm)]->tip, $terms[strtolower($term_norm)]->format) : '';
+-          $link->appendXML(theme('glossify_links', array('type' => $type, 'id' => $terms[strtolower($term_norm)]->id, 'text' => $term_txt, 'tip' => $tip)));
++          $link->appendXML(theme('glossify_links', array('type' => $type, 'id' => $terms[strtolower($term_norm)]->id, 'text' => $term_txt, 'tip' => $tip, 'langcode' => $langcode)));
+           $matched[] = ($case_sensitivity ? $match[0] : strtolower($match[0]));
+         }
+         $parent->insertBefore($link, $refnode);
+@@ -358,6 +358,9 @@
+   else {
+     $path = 'node/' . $vars['id'];
+   }
++  
++  $languages = language_list();
++  $language = $languages[$vars['langcode']];
+ 
+   if ($vars['tip']) {
+     return l(check_plain($vars['text']) . '<img src = "/' . drupal_get_path('module', 'glossify') . '/info.png" />', $path, array('html' => true, 'attributes' => array('class' => array('glossify-link'), 'title' => $vars['tip'])));

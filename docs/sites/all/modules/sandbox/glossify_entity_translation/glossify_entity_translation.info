@@ -1,0 +1,6 @@
+name = Glossify Translation
+description = Adds entity translation support to Glossify.
+package = "Input filters"
+core = 7.x
+dependencies[] = glossify
+dependencies[] = entity_translation

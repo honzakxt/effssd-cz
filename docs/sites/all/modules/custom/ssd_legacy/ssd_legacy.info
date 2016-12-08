@@ -1,0 +1,4 @@
+name = SSD Legacy
+description = Support for ssd.eff.org legacy content
+core = 7.x
+package = EFF

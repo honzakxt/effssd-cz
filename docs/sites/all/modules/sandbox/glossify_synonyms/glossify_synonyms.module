@@ -1,0 +1,23 @@
+<?php
+
+/**
+ * Implements hook_glossify_terms_alter().
+ */
+function glossify_synonyms_glossify_terms_alter(&$terms, $context) {
+  $vocabs = array_filter($context['filter']->settings['glossify_taxonomy_vocabs']);
+  if (!$vocabs) {
+    return;
+  }
+  $rows = db_query("SELECT tid AS id, field_synonym_value AS name, LOWER(field_synonym_value) AS name_norm, description_field_value AS tip, description_field_format AS format
+    FROM {taxonomy_term_data} t
+    INNER JOIN {field_data_field_synonym} s ON s.entity_id = t.tid AND s.entity_type = :type
+    INNER JOIN {field_data_description_field} d ON d.entity_id = t.tid AND d.entity_type = :type
+    WHERE vid IN (:vids)
+    AND s.language = :lang
+    AND d.language = :lang
+    AND d.delta = 0
+    AND d.deleted = 0", [':vids' => $vocabs, ':type' => 'taxonomy_term', ':lang' => $context['langcode']]);
+  foreach ($rows as $row) {
+    $terms[$row->name_norm] = $row;
+  }
+}

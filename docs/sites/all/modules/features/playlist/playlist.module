@@ -1,0 +1,86 @@
+<?php
+/**
+ * @file
+ * Code for the Playlist feature.
+ */
+include_once 'playlist.features.inc';
+
+function playlist_entity_info_alter(&$entity_info) {
+  $entity_info['node']['view modes']['playlist'] = array(
+    'label' => t('Playlist.'),
+    'custom settings' => TRUE,
+  );
+}
+
+function playlist_preprocess_node(&$vars) {
+  // Include this for access to pathauto_cleanstring().
+  require_once(drupal_get_path('module', 'pathauto') . '/pathauto.inc');
+  global $language;
+  global $base_url;
+  // Shorthand
+  $node = $vars['node'];
+
+  if ($vars['type'] == 'playlist') {
+    
+    // Add JS for playlist pages
+    $flexslider_path = libraries_get_path('flexslider') . '/jquery.flexslider-min.js';
+    $hashchange_path = libraries_get_path('hashchange') . '/jquery.ba-hashchange.min.js';
+    $playlist_path = drupal_get_path('module', 'playlist');
+    drupal_add_js($flexslider_path);
+    drupal_add_js($hashchange_path);
+    drupal_add_library('system', 'effects');
+    drupal_add_js($playlist_path . '/js/playlist.js');
+    drupal_add_css($playlist_path . '/css/playlist-styles.css');
+
+    // Slide HTML
+    $slides = array();
+    // Table of Contents HTML
+    $toc = '';
+    // Slide index, for permlink.
+    $index = 1;
+    // Get alias for permlink construction.
+    $alias = url('node/' . $node->nid);
+    // The list of modules cannot be translated so use language none.
+    $modules = $node->field_playlist_module[LANGUAGE_NONE];
+    
+    $indexes = array();
+    $hashlinks = array(0 => 'playlist');
+    foreach ($modules as $row) {
+      if ($row['access'] == TRUE) {
+        $module = node_load($row['nid']);
+
+        // @todo Uniquify this - what if same title is used? Blah.
+        $module_link = rawurlencode(pathauto_cleanstring($module->title));
+        $indexes[$module_link] = $index;
+        $hashlinks[$index] = $module_link;
+
+        // Construct a permlink.
+        $permlink = '<p><a href="' . $alias . '#' . rawurlencode(pathauto_cleanstring($module->title)) . '">Permlink</a></p>';
+
+        // Render module node for display in playlist.
+        $title = check_plain($module->title);
+        $view = node_view($module, 'playlist');
+        $body = drupal_render($view);
+        $slides[] = $body;
+        $toc .= '<li class="module-toc module-' . $index . '">' . '<a href="' . $alias . '#' . rawurlencode(pathauto_cleanstring($module->title)) . '" class="playlist-toc-link">'. $title . '</a></li>';
+        $index++;
+      }
+    }
+    // Set slides and table of contents so they can be access in the template.
+    $vars['slides'] = $slides;
+    $vars['playlist_table'] = '<div class="playlist-table"><ol class="playlist-table-of-contents">' . $toc . '</ol></div>';
+
+    $slide_html = '';
+    foreach ($vars['slides'] as $slide) {
+      $slide_html .= "<li>$slide</li>\n";
+    }
+    $vars['playlist_slides'] = $slide_html;
+
+    $settings = array(
+      'indexes' => $indexes,
+      'hashLinks' => $hashlinks,
+    );
+    // Pass permlink info to JS.
+    drupal_add_js(array('playlist' => $settings), 'setting');
+  }
+}

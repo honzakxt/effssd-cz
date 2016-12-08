@@ -1,0 +1,120 @@
+<?php
+/**
+ * @file
+ * Code for the Surveillance Self Defence  feature.
+ */
+
+include_once 'ssd_library.features.inc';
+
+/**
+ * Implementation of hook_ctools_plugin_directory().
+ */
+function ssd_library_ctools_plugin_directory($module, $plugin) {
+  return 'plugins/' . $plugin;
+}
+
+/**
+ * Implements hook_taxonomy_term_view_alter().
+ */
+function ssd_library_taxonomy_term_view_alter(&$build) {
+  if (isset($build['field_synonym'])) {
+    if ($build['field_synonym']['#language'] != 'en' && $build['field_synonym']['#language'] != $build['description_field']['#language']) {
+      $build['field_synonym']['#access'] = FALSE;
+    }
+  }
+}
+
+/**
+ * Implements hook_taxonomy_term_view_alter().
+ */
+function ssd_library_page_alter(&$page) {
+  $page['content']['system_main']['no_content']['#access'] = FALSE;
+}
+
+function ssd_library_glossify_terms_alter(&$terms, $context) {
+  uksort($terms, '_sort_by_length');
+}
+
+function _sort_by_length($a, $b) {
+  if (strlen($a) == strlen($b)) {
+    return 0;
+  }
+  if (strlen($a) < strlen($b)) {
+    return 1;
+  }
+  return -1;
+}
+
+/**
+ * Implements hook_feedback_presave().
+ */
+function ssd_library_feedback_presave($entry) {
+  // Tag IE6 feedback as processed - it's mostly spam!
+  if (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE 6.0')) {
+    $entry->status = FEEDBACK_PROCESSED;
+  }
+}
+
+/**
+ * Implements hook_help().
+ */
+function ssd_library_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#ssd_library':
+      // This is here so the site name becomes translatable.
+      return t('Surveillance Self-Defense');
+  }
+}
+
+/**
+ * Implements hook_entity_presave().
+ */
+function ssd_library_entity_presave($entity, $type) {
+  // Remove all carriage return (CR) characters.
+  foreach (field_info_fields() as $field) {
+    if ($field['type'] == 'text_long' || $field['type'] == 'text_with_summary') {
+      if (isset($entity->{$field['field_name']})) {
+        foreach ($entity->{$field['field_name']} as $langcode => $items) {
+          foreach ($items as $delta => $item) {
+            $entity->{$field['field_name']}[$langcode][$delta]['value'] = str_replace("\r", '', $entity->{$field['field_name']}[$langcode][$delta]['value']); 
+            if ($field['type'] == 'text_with_summary' && isset($entity->{$field['field_name']}[$langcode][$delta]['summary'])) {
+              $entity->{$field['field_name']}[$langcode][$delta]['summary'] = str_replace("\r", '', $entity->{$field['field_name']}[$langcode][$delta]['summary']); 
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_custom_theme().
+ */
+function ssd_library_custom_theme() {
+  // Use admin theme for translate job pages.
+  if (arg(0) == 'translate') {
+    return variable_get('admin_theme', 'seven');
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function ssd_library_form_feedback_form_alter(&$form, &$form_state, $form_id) {
+  // Add honeypot protection to the feedback form.
+  if (module_exists('honeypot')) {
+    honeypot_add_form_protection($form, $form_state, ['honeypot']);
+  }
+}
+
+/**
+ * Implements hook_mail_alter().
+ */
+function ssd_library_mail_alter(&$message) {
+  // Spam filtering on EFF mailing lists is currently broken, so make contact
+  // form submissions look like they're coming from the site, thus we can block
+  // messages from non-subscribers.
+  if ($message['id'] == 'contact_page_mail') {
+    $message['headers']['From'] = variable_get('site_mail', ini_get('sendmail_from'));
+  }
+}

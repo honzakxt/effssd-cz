@@ -1,0 +1,64 @@
+.menu-hamburger {
+  background-position: left center;
+  padding: 0 5px 0 25px;
+}
+
+#language-switcher .region-language-switcher {
+  right: auto;
+  left: 0px;
+}
+
+.search-form-header,
+#language-switcher {
+  padding-left: 0;
+  padding-right: 10px;
+}
+
+#top-eff-header {
+  padding-right: 0px;
+  padding-left: 10px;
+}
+
+#playlist-controller .playlist-table {
+  text-align: right;
+}
+
+#playlist-controller {
+  left: 20px;
+  right: auto;
+}
+
+#feedback-controller {
+  right: 20px;
+  left: auto;
+}
+
+#block-feedback-form {
+  right: 20px;
+  left: auto;
+}
+
+#playlist-controller #playlist-next {
+  margin-right: 0;
+  margin-left: 5px;
+}
+
+.module-section h2, .view-search h2 {
+  text-align: right;
+}
+
+.region-footer {
+  margin-left: 0;
+}
+
+.region-footer ul.menu.nav {
+  padding-right: 0;
+}
+
+.flex-direction-nav a.flex-prev, .flex-direction-nav a.flex-next {
+  text-align: right;
+}
+
+.connect-bar {
+  right: 45%;
+}

@@ -1,0 +1,12 @@
+name = Glossify
+description = "Automatically links content to other content or taxonomy."
+package = "Input filters"
+dependencies[] = filter
+core = 7.x
+configure = admin/config/content/formats
+; Information added by Drupal.org packaging script on 2014-09-09
+version = "7.x-4.0-beta1+7-dev"
+core = "7.x"
+project = "glossify"
+datestamp = "1410279013"
+

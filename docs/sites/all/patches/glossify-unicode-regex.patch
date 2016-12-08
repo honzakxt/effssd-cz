@@ -1,0 +1,11 @@
+--- glossify.module	2014-10-17 03:07:32.573386482 -0700
++++ glossify.module	2014-10-17 03:08:20.385623566 -0700
+@@ -291,7 +291,7 @@
+     $term_norm = preg_replace('/\s+/', ' ', trim($term->name_norm));
+     $pattern[] = preg_replace('/ /', '\\s+', preg_quote($term_norm));
+   }
+-  $pattern  = '/\b(' . implode('|', $pattern) . ')\b/';
++  $pattern  = '/\b(' . implode('|', $pattern) . ')\b/u';
+   if (!$case_sensitivity) {
+     $pattern .= 'i';
+   }
