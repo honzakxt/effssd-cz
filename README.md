@@ -1,7 +1,7 @@
 Surveillance Self Defense - Czech translation
 =============================================
 
-**More info here: https://brmlab.cz/project/eff-ssdcz/start#eff_surveillance_self-defense_czech_translation**
+**More info here: https://brmlab.cz/project/eff-ssdcz/start**
 
 Copyleft (c) 2014 Electronic Frontier Foundation.
 
